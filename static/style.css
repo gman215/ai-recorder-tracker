@@ -73,6 +73,8 @@ main { max-width: 960px; margin: 1.5rem auto; padding: 0 1rem; }
 
 .card .meta { font-size: 0.85rem; color: #555e70; margin: 0; }
 .card .meta.overdue { color: #b02a2a; font-weight: 600; }
+.card .meta.reservation { display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
+.res-cancel { padding: 0 0.4rem; font-size: 0.75rem; line-height: 1.4; }
 
 .card-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: auto; padding-top: 0.5rem; }
 

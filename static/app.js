@@ -69,11 +69,23 @@ const ACTION_LABELS = {
   check_in: "Checked in",
   mark_unavailable: "Marked unavailable",
   mark_available: "Marked available",
+  reserve: "Reserved",
+  cancel_reservation: "Reservation cancelled",
 };
+
+let reservationsByItem = new Map();
 
 async function refreshEquipment() {
   try {
-    const items = await api("/api/equipment");
+    const [items, reservations] = await Promise.all([
+      api("/api/equipment"),
+      api("/api/reservations"),
+    ]);
+    reservationsByItem = new Map();
+    for (const r of reservations) {
+      if (!reservationsByItem.has(r.equipment_id)) reservationsByItem.set(r.equipment_id, []);
+      reservationsByItem.get(r.equipment_id).push(r);
+    }
     renderEquipment(items);
   } catch (err) {
     toast(err.message, true);
@@ -92,6 +104,18 @@ function renderEquipment(items) {
       btn.dataset.name,
     ));
   });
+  list.querySelectorAll("[data-cancel-res]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!confirm(`Cancel ${btn.dataset.holder}'s reservation?`)) return;
+      try {
+        await api(`/api/reservations/${btn.dataset.cancelRes}`, { method: "DELETE" });
+        toast("Reservation cancelled.");
+        await refreshEquipment();
+      } catch (err) {
+        toast(err.message, true);
+      }
+    });
+  });
 }
 
 function cardHtml(item) {
@@ -108,6 +132,12 @@ function cardHtml(item) {
     meta += `<p class="meta">Reason: ${escapeHtml(item.note || "—")}</p>`;
   }
 
+  for (const r of reservationsByItem.get(item.id) || []) {
+    meta += `<p class="meta reservation">📅 Reserved by <strong>${escapeHtml(r.holder)}</strong>
+      ${fmtDateTime(r.start_at)} → ${fmtDateTime(r.end_at)}${r.note ? ` · ${escapeHtml(r.note)}` : ""}
+      <button class="btn subtle danger res-cancel" data-cancel-res="${r.id}" data-holder="${escapeHtml(r.holder)}" title="Cancel reservation">✕</button></p>`;
+  }
+
   const actions = {
     available: `
       <button class="btn primary" data-action="checkout" data-id="${item.id}" data-name="${escapeHtml(item.name)}">Check out</button>
@@ -116,7 +146,8 @@ function cardHtml(item) {
       <button class="btn primary" data-action="checkin" data-id="${item.id}" data-name="${escapeHtml(item.name)}">Check in</button>`,
     unavailable: `
       <button class="btn primary" data-action="available" data-id="${item.id}" data-name="${escapeHtml(item.name)}">Mark available</button>`,
-  }[item.status];
+  }[item.status] + `
+      <button class="btn" data-action="reserve" data-id="${item.id}" data-name="${escapeHtml(item.name)}">Reserve</button>`;
 
   return `
     <div class="card">
@@ -134,6 +165,8 @@ async function handleAction(action, id, name) {
   try {
     if (action === "checkout") {
       openCheckoutDialog(id, name);
+    } else if (action === "reserve") {
+      openReserveDialog(id, name);
     } else if (action === "checkin") {
       await api(`/api/equipment/${id}/checkin`, { method: "POST", body: JSON.stringify({}) });
       toast(`${name} checked in.`);
@@ -202,6 +235,37 @@ $("#checkout-form").addEventListener("submit", async (e) => {
     });
     $("#checkout-dialog").close();
     toast("Checked out.");
+    await refreshEquipment();
+  } catch (err) {
+    toast(err.message, true);
+  }
+});
+
+let reserveTargetId = null;
+function openReserveDialog(id, name) {
+  reserveTargetId = id;
+  $("#reserve-item-name").textContent = name;
+  $("#reserve-form").reset();
+  $("#reserve-dialog").showModal();
+}
+
+$("#reserve-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const start = $("#reserve-start").value;
+  const end = $("#reserve-end").value;
+  const note = $("#reserve-note").value.trim();
+  try {
+    await api(`/api/equipment/${reserveTargetId}/reservations`, {
+      method: "POST",
+      body: JSON.stringify({
+        holder: $("#reserve-holder").value.trim(),
+        start_at: new Date(start).toISOString(),
+        end_at: new Date(end).toISOString(),
+        note: note || null,
+      }),
+    });
+    $("#reserve-dialog").close();
+    toast("Reserved.");
     await refreshEquipment();
   } catch (err) {
     toast(err.message, true);
@@ -408,6 +472,10 @@ function renderDayDetails(entries) {
         : `${fmtDateTime(iv.start)} (no expected return)`;
       return `<li><strong>${escapeHtml(iv.equipment_name)}</strong> — checked out by ${escapeHtml(iv.holder)}<br>
         <small>${range}${iv.note ? ` · ${escapeHtml(iv.note)}` : ""}</small></li>`;
+    }
+    if (iv.type === "reserved") {
+      return `<li><strong>${escapeHtml(iv.equipment_name)}</strong> — reserved by ${escapeHtml(iv.holder)}<br>
+        <small>${fmtDateTime(iv.start)} → ${fmtDateTime(iv.end)}${iv.note ? ` · ${escapeHtml(iv.note)}` : ""}</small></li>`;
     }
     const range = iv.end
       ? `${fmtDateTime(iv.start)} → ${fmtDateTime(iv.end)}`

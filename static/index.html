@@ -46,6 +46,7 @@
       <span><i class="dot dot-available"></i> Available</span>
       <span><i class="dot dot-partial"></i> Partially booked</span>
       <span><i class="dot dot-full"></i> Fully unavailable</span>
+      <span>· Future reservations count as booked</span>
     </div>
     <div id="calendar-grid" class="cal-grid"></div>
     <div id="day-details" class="day-details hidden"></div>
@@ -62,6 +63,21 @@
     <div class="dialog-actions">
       <button type="button" class="btn" data-close>Cancel</button>
       <button type="submit" class="btn primary">Check out</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Reserve dialog -->
+<dialog id="reserve-dialog">
+  <form id="reserve-form" method="dialog">
+    <h3>Reserve <span id="reserve-item-name"></span></h3>
+    <label>Who's booking it? <input id="reserve-holder" type="text" maxlength="200" required></label>
+    <label>From <input id="reserve-start" type="datetime-local" required></label>
+    <label>Until <input id="reserve-end" type="datetime-local" required></label>
+    <label>Note (optional) <input id="reserve-note" type="text" maxlength="1000"></label>
+    <div class="dialog-actions">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="submit" class="btn primary">Reserve</button>
     </div>
   </form>
 </dialog>
