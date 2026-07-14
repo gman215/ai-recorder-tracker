@@ -5,7 +5,7 @@ A tiny self-hosted web app for tracking who has the team's AI recorders (or any 
 ## Features
 
 - **Equipment tab** — add/delete items, check out (with holder name and optional expected return), check in, mark unavailable with a required reason (e.g. "in repair"), per-item history of the last 25 events.
-- **Reservations** — book an item for a future time interval (start → end), not just from today. Overlapping reservations are rejected, a checkout that would run into someone else's reservation is rejected, and checking out during your own reservation fulfills (consumes) it. Reservations appear on the cards and block the calendar.
+- **Reservations** — one unified **Reserve** flow: leave "From" as now and the item is checked out immediately; pick a future start to book ahead (future bookings need an end time). Overlapping reservations are rejected, a checkout that would run into someone else's reservation is rejected, and checking out during your own reservation fulfills (consumes) it. Reservations appear on the cards and block the calendar.
 - **Calendar tab** — month view of availability across all equipment (or filtered to one item). Days are color-coded: green = everything free, amber = partially booked, red = everything busy. Click a day to see exactly which items are out/unavailable and who has them.
 - State transitions are enforced server-side (you can't check out something that's already out; marking unavailable requires a reason; a checked-out item must be checked in before deletion). Status changes and the event log are written in the same SQLite transaction, so they can never disagree.
 

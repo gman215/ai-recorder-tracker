@@ -140,14 +140,15 @@ function cardHtml(item) {
 
   const actions = {
     available: `
-      <button class="btn primary" data-action="checkout" data-id="${item.id}" data-name="${escapeHtml(item.name)}">Check out</button>
+      <button class="btn primary" data-action="reserve" data-id="${item.id}" data-name="${escapeHtml(item.name)}">Reserve</button>
       <button class="btn" data-action="unavailable" data-id="${item.id}" data-name="${escapeHtml(item.name)}">Mark unavailable</button>`,
     checked_out: `
-      <button class="btn primary" data-action="checkin" data-id="${item.id}" data-name="${escapeHtml(item.name)}">Check in</button>`,
+      <button class="btn primary" data-action="checkin" data-id="${item.id}" data-name="${escapeHtml(item.name)}">Check in</button>
+      <button class="btn" data-action="reserve" data-id="${item.id}" data-name="${escapeHtml(item.name)}">Reserve</button>`,
     unavailable: `
-      <button class="btn primary" data-action="available" data-id="${item.id}" data-name="${escapeHtml(item.name)}">Mark available</button>`,
-  }[item.status] + `
-      <button class="btn" data-action="reserve" data-id="${item.id}" data-name="${escapeHtml(item.name)}">Reserve</button>`;
+      <button class="btn primary" data-action="available" data-id="${item.id}" data-name="${escapeHtml(item.name)}">Mark available</button>
+      <button class="btn" data-action="reserve" data-id="${item.id}" data-name="${escapeHtml(item.name)}">Reserve</button>`,
+  }[item.status];
 
   return `
     <div class="card">
@@ -163,9 +164,7 @@ function cardHtml(item) {
 
 async function handleAction(action, id, name) {
   try {
-    if (action === "checkout") {
-      openCheckoutDialog(id, name);
-    } else if (action === "reserve") {
+    if (action === "reserve") {
       openReserveDialog(id, name);
     } else if (action === "checkin") {
       await api(`/api/equipment/${id}/checkin`, { method: "POST", body: JSON.stringify({}) });
@@ -211,61 +210,59 @@ document.querySelectorAll("dialog [data-close]").forEach((btn) => {
   btn.addEventListener("click", () => btn.closest("dialog").close());
 });
 
-let checkoutTargetId = null;
-function openCheckoutDialog(id, name) {
-  checkoutTargetId = id;
-  $("#checkout-item-name").textContent = name;
-  $("#checkout-form").reset();
-  $("#checkout-dialog").showModal();
+// Local "YYYY-MM-DDTHH:MM" string for prefilling datetime-local inputs.
+function localNowValue() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
-
-$("#checkout-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const holder = $("#checkout-holder").value.trim();
-  const ret = $("#checkout-return").value; // local datetime string or ""
-  const note = $("#checkout-note").value.trim();
-  try {
-    await api(`/api/equipment/${checkoutTargetId}/checkout`, {
-      method: "POST",
-      body: JSON.stringify({
-        holder,
-        expected_return_at: ret ? new Date(ret).toISOString() : null,
-        note: note || null,
-      }),
-    });
-    $("#checkout-dialog").close();
-    toast("Checked out.");
-    await refreshEquipment();
-  } catch (err) {
-    toast(err.message, true);
-  }
-});
 
 let reserveTargetId = null;
 function openReserveDialog(id, name) {
   reserveTargetId = id;
   $("#reserve-item-name").textContent = name;
   $("#reserve-form").reset();
+  $("#reserve-start").value = localNowValue();
   $("#reserve-dialog").showModal();
 }
 
+// One flow for both: a start time at (or before) now checks the item out
+// immediately; a future start creates a reservation.
 $("#reserve-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const start = $("#reserve-start").value;
+  const holder = $("#reserve-holder").value.trim();
+  const start = new Date($("#reserve-start").value);
   const end = $("#reserve-end").value;
   const note = $("#reserve-note").value.trim();
+  const startsNow = start.getTime() - Date.now() < 60_000;
   try {
-    await api(`/api/equipment/${reserveTargetId}/reservations`, {
-      method: "POST",
-      body: JSON.stringify({
-        holder: $("#reserve-holder").value.trim(),
-        start_at: new Date(start).toISOString(),
-        end_at: new Date(end).toISOString(),
-        note: note || null,
-      }),
-    });
+    if (startsNow) {
+      await api(`/api/equipment/${reserveTargetId}/checkout`, {
+        method: "POST",
+        body: JSON.stringify({
+          holder,
+          expected_return_at: end ? new Date(end).toISOString() : null,
+          note: note || null,
+        }),
+      });
+      toast("Checked out.");
+    } else {
+      if (!end) {
+        toast("Future bookings need an \"Until\" time.", true);
+        return;
+      }
+      await api(`/api/equipment/${reserveTargetId}/reservations`, {
+        method: "POST",
+        body: JSON.stringify({
+          holder,
+          start_at: start.toISOString(),
+          end_at: new Date(end).toISOString(),
+          note: note || null,
+        }),
+      });
+      toast("Reserved.");
+    }
     $("#reserve-dialog").close();
-    toast("Reserved.");
     await refreshEquipment();
   } catch (err) {
     toast(err.message, true);

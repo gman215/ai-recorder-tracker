@@ -53,27 +53,14 @@
   </section>
 </main>
 
-<!-- Check-out dialog -->
-<dialog id="checkout-dialog">
-  <form id="checkout-form" method="dialog">
-    <h3>Check out <span id="checkout-item-name"></span></h3>
-    <label>Who's taking it? <input id="checkout-holder" type="text" maxlength="200" required></label>
-    <label>Expected return (optional) <input id="checkout-return" type="datetime-local"></label>
-    <label>Note (optional) <input id="checkout-note" type="text" maxlength="1000"></label>
-    <div class="dialog-actions">
-      <button type="button" class="btn" data-close>Cancel</button>
-      <button type="submit" class="btn primary">Check out</button>
-    </div>
-  </form>
-</dialog>
-
-<!-- Reserve dialog -->
+<!-- Reserve dialog (also handles immediate checkout when From = now) -->
 <dialog id="reserve-dialog">
   <form id="reserve-form" method="dialog">
     <h3>Reserve <span id="reserve-item-name"></span></h3>
-    <label>Who's booking it? <input id="reserve-holder" type="text" maxlength="200" required></label>
+    <p class="hint">Leave "From" as now to check it out immediately, or pick a future start to book ahead.</p>
+    <label>Who's taking it? <input id="reserve-holder" type="text" maxlength="200" required></label>
     <label>From <input id="reserve-start" type="datetime-local" required></label>
-    <label>Until <input id="reserve-end" type="datetime-local" required></label>
+    <label>Until <span class="hint-inline">(optional when starting now)</span> <input id="reserve-end" type="datetime-local"></label>
     <label>Note (optional) <input id="reserve-note" type="text" maxlength="1000"></label>
     <div class="dialog-actions">
       <button type="button" class="btn" data-close>Cancel</button>

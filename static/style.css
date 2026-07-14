@@ -194,6 +194,8 @@ dialog {
 }
 dialog::backdrop { background: rgba(20, 25, 40, 0.4); }
 dialog h3 { margin-top: 0; }
+dialog .hint { font-size: 0.82rem; color: #7a8296; margin: -0.25rem 0 0.75rem; }
+.hint-inline { font-size: 0.78rem; color: #7a8296; font-weight: normal; }
 dialog label { display: block; margin-bottom: 0.75rem; font-size: 0.9rem; color: #37404f; }
 dialog input, dialog select {
   display: block;
