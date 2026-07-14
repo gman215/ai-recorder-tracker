@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recorder Tracker</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>🎙️ Recorder Tracker</h1>
+  <nav>
+    <button id="tab-equipment" class="tab active">Equipment</button>
+    <button id="tab-calendar" class="tab">Calendar</button>
+  </nav>
+</header>
+
+<main>
+  <!-- Equipment view -->
+  <section id="view-equipment">
+    <form id="add-form" class="add-form">
+      <input id="add-name" type="text" placeholder="New equipment name (e.g. Zoom H5 #3)" maxlength="200" required>
+      <button type="submit" class="btn primary">Add</button>
+    </form>
+    <div id="equipment-list" class="cards"></div>
+    <p id="equipment-empty" class="empty hidden">No equipment yet — add your first recorder above.</p>
+  </section>
+
+  <!-- Calendar view -->
+  <section id="view-calendar" class="hidden">
+    <div class="cal-controls">
+      <div class="cal-nav">
+        <button id="cal-prev" class="btn" title="Previous month">‹</button>
+        <button id="cal-today" class="btn">Today</button>
+        <button id="cal-next" class="btn" title="Next month">›</button>
+        <h2 id="cal-title"></h2>
+      </div>
+      <label class="cal-filter">
+        Show:
+        <select id="cal-filter">
+          <option value="">All equipment</option>
+        </select>
+      </label>
+    </div>
+    <div class="cal-legend">
+      <span><i class="dot dot-available"></i> Available</span>
+      <span><i class="dot dot-partial"></i> Partially booked</span>
+      <span><i class="dot dot-full"></i> Fully unavailable</span>
+    </div>
+    <div id="calendar-grid" class="cal-grid"></div>
+    <div id="day-details" class="day-details hidden"></div>
+  </section>
+</main>
+
+<!-- Check-out dialog -->
+<dialog id="checkout-dialog">
+  <form id="checkout-form" method="dialog">
+    <h3>Check out <span id="checkout-item-name"></span></h3>
+    <label>Who's taking it? <input id="checkout-holder" type="text" maxlength="200" required></label>
+    <label>Expected return (optional) <input id="checkout-return" type="datetime-local"></label>
+    <label>Note (optional) <input id="checkout-note" type="text" maxlength="1000"></label>
+    <div class="dialog-actions">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="submit" class="btn primary">Check out</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Mark-unavailable dialog -->
+<dialog id="unavailable-dialog">
+  <form id="unavailable-form" method="dialog">
+    <h3>Mark <span id="unavailable-item-name"></span> unavailable</h3>
+    <label>Reason (required) <input id="unavailable-note" type="text" maxlength="1000" placeholder="e.g. in repair" required></label>
+    <div class="dialog-actions">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="submit" class="btn danger">Mark unavailable</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- History dialog -->
+<dialog id="history-dialog">
+  <h3>History — <span id="history-item-name"></span></h3>
+  <div id="history-list" class="history-list"></div>
+  <div class="dialog-actions">
+    <button type="button" class="btn" data-close>Close</button>
+  </div>
+</dialog>
+
+<div id="toast" class="toast hidden"></div>
+<script src="app.js"></script>
+</body>
+</html>
