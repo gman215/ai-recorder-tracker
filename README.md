@@ -4,9 +4,9 @@ A tiny self-hosted web app for tracking who has the team's AI recorders (or any 
 
 ## Features
 
-- **Equipment tab** — add/delete items, check out (with holder name and optional expected return), check in, mark unavailable with a required reason (e.g. "in repair"), per-item history of the last 25 events.
-- **Reservations** — one unified **Reserve** flow: leave "From" as now and the item is checked out immediately; pick a future start to book ahead (future bookings need an end time). Overlapping reservations are rejected, a checkout that would run into someone else's reservation is rejected, and checking out during your own reservation fulfills (consumes) it. Reservations appear on the cards and block the calendar.
-- **Calendar tab** — month view of availability across all equipment (or filtered to one item). Days are color-coded: green = everything free, amber = partially booked, red = everything busy. Click a day to see exactly which items are out/unavailable and who has them.
+- **Equipment tab** — a searchable, filterable table: one row per item with status chip, holder, relative due dates ("due in 2d", "3d overdue"), and upcoming-reservation chips. Status pills with live counts (All / Available / Out / Overdue / Unavailable) double as filters; overdue items sort to the top. Row actions: one primary button per state plus an overflow menu (reserve ahead, history, mark unavailable, delete).
+- **Reservations** — one unified **Reserve** flow: leave "From" as now and the item is checked out immediately; pick a future start to book ahead (future bookings need an end time). The dialog remembers your name and offers duration presets (end of day / +1 day / +3 days / +1 week). Overlapping reservations are rejected, a checkout that would run into someone else's reservation is rejected, and checking out during your own reservation fulfills (consumes) it.
+- **Timeline tab** — a resource timeline (Gantt-style): one row per item, 4 visible weeks, colored bars for checkouts (amber), reservations (blue), and unavailable periods (red). Weekend shading, a today/now marker, dashed edges for open-ended spans, muted bars for past history. Click a bar for details; navigate by week.
 - State transitions are enforced server-side (you can't check out something that's already out; marking unavailable requires a reason; a checked-out item must be checked in before deletion). Status changes and the event log are written in the same SQLite transaction, so they can never disagree.
 
 ## Setup & run
@@ -57,7 +57,7 @@ recorder.db         SQLite database (created at first run)
 
 Invalid transitions return `409` with a human-readable `detail` message that the UI surfaces as a toast.
 
-Calendar semantics: a checkout spans `checked_out_at → expected_return_at` (or the actual check-in time once returned). A checkout with **no** expected return shows only on its checkout day rather than blocking the calendar forever — but an item that's overdue keeps blocking through today. An unavailable item spans from when it was marked unavailable until it's marked available again (ongoing if it hasn't been). Reservations block their booked `start_at → end_at` range; back-to-back bookings (one ending exactly when the next starts) are allowed.
+Timeline semantics (from `/api/calendar` intervals): a checkout spans `checked_out_at → expected_return_at` (or the actual check-in time once returned). A checkout with **no** expected return draws up to now, not into the future — but an item that's overdue keeps blocking through today. An unavailable item spans from when it was marked unavailable until it's marked available again (fills the visible future if it hasn't been). Reservations block their booked `start_at → end_at` range; back-to-back bookings (one ending exactly when the next starts) are allowed.
 
 All timestamps are stored as UTC ISO 8601 and rendered in the viewer's local timezone by the browser. Set `RECORDER_DB=/path/to/file.db` to override where the database lives.
 

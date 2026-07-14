@@ -11,45 +11,52 @@
   <h1>🎙️ Recorder Tracker</h1>
   <nav>
     <button id="tab-equipment" class="tab active">Equipment</button>
-    <button id="tab-calendar" class="tab">Calendar</button>
+    <button id="tab-timeline" class="tab">Timeline</button>
   </nav>
 </header>
 
 <main>
   <!-- Equipment view -->
   <section id="view-equipment">
-    <form id="add-form" class="add-form">
-      <input id="add-name" type="text" placeholder="New equipment name (e.g. Zoom H5 #3)" maxlength="200" required>
-      <button type="submit" class="btn primary">Add</button>
-    </form>
-    <div id="equipment-list" class="cards"></div>
-    <p id="equipment-empty" class="empty hidden">No equipment yet — add your first recorder above.</p>
+    <div class="toolbar">
+      <input id="search" type="search" placeholder="Search equipment or holder…">
+      <div id="status-pills" class="pills"></div>
+      <form id="add-form" class="add-form">
+        <input id="add-name" type="text" placeholder="New equipment name" maxlength="200" required>
+        <button type="submit" class="btn primary">Add</button>
+      </form>
+    </div>
+    <div class="table-wrap">
+      <table id="equipment-table">
+        <thead>
+          <tr>
+            <th>Item</th><th>Status</th><th>Who</th><th>Due / info</th><th>Upcoming</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="equipment-rows"></tbody>
+      </table>
+      <p id="equipment-empty" class="empty hidden">Nothing here — add your first recorder above, or clear the search/filter.</p>
+    </div>
   </section>
 
-  <!-- Calendar view -->
-  <section id="view-calendar" class="hidden">
-    <div class="cal-controls">
-      <div class="cal-nav">
-        <button id="cal-prev" class="btn" title="Previous month">‹</button>
-        <button id="cal-today" class="btn">Today</button>
-        <button id="cal-next" class="btn" title="Next month">›</button>
-        <h2 id="cal-title"></h2>
+  <!-- Timeline view -->
+  <section id="view-timeline" class="hidden">
+    <div class="tl-controls">
+      <div class="tl-nav">
+        <button id="tl-prev" class="btn" title="Back one week">‹</button>
+        <button id="tl-today" class="btn">Today</button>
+        <button id="tl-next" class="btn" title="Forward one week">›</button>
+        <h2 id="tl-range"></h2>
       </div>
-      <label class="cal-filter">
-        Show:
-        <select id="cal-filter">
-          <option value="">All equipment</option>
-        </select>
-      </label>
+      <div class="tl-legend">
+        <span><i class="dot dot-out"></i> Checked out</span>
+        <span><i class="dot dot-res"></i> Reserved</span>
+        <span><i class="dot dot-unav"></i> Unavailable</span>
+      </div>
     </div>
-    <div class="cal-legend">
-      <span><i class="dot dot-available"></i> Available</span>
-      <span><i class="dot dot-partial"></i> Partially booked</span>
-      <span><i class="dot dot-full"></i> Fully unavailable</span>
-      <span>· Future reservations count as booked</span>
-    </div>
-    <div id="calendar-grid" class="cal-grid"></div>
-    <div id="day-details" class="day-details hidden"></div>
+    <div class="tl-wrap"><div id="timeline" class="tl-grid"></div></div>
+    <p id="timeline-empty" class="empty hidden">No equipment yet — add items on the Equipment tab.</p>
+    <div id="tl-details" class="detail-panel hidden"></div>
   </section>
 </main>
 
@@ -61,6 +68,12 @@
     <label>Who's taking it? <input id="reserve-holder" type="text" maxlength="200" required></label>
     <label>From <input id="reserve-start" type="datetime-local" required></label>
     <label>Until <span class="hint-inline">(optional when starting now)</span> <input id="reserve-end" type="datetime-local"></label>
+    <div class="presets" id="reserve-presets">
+      <button type="button" class="btn preset" data-preset="eod">End of day</button>
+      <button type="button" class="btn preset" data-preset="1">+1 day</button>
+      <button type="button" class="btn preset" data-preset="3">+3 days</button>
+      <button type="button" class="btn preset" data-preset="7">+1 week</button>
+    </div>
     <label>Note (optional) <input id="reserve-note" type="text" maxlength="1000"></label>
     <div class="dialog-actions">
       <button type="button" class="btn" data-close>Cancel</button>
