@@ -2,6 +2,8 @@
 
 Run with: uvicorn main:app --reload
 """
+import csv
+import io
 import os
 import sqlite3
 from contextlib import contextmanager
@@ -10,6 +12,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -197,6 +200,18 @@ def add_equipment(body: EquipmentIn):
     return dict(row)
 
 
+@app.patch("/api/equipment/{equipment_id}")
+def rename_equipment(equipment_id: int, body: EquipmentIn):
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Name cannot be blank")
+    with db() as conn:
+        get_item(conn, equipment_id)
+        conn.execute("UPDATE equipment SET name = ? WHERE id = ?", (name, equipment_id))
+        row = conn.execute("SELECT * FROM equipment WHERE id = ?", (equipment_id,)).fetchone()
+    return dict(row)
+
+
 @app.delete("/api/equipment/{equipment_id}")
 def delete_equipment(equipment_id: int):
     with db() as conn:
@@ -331,6 +346,33 @@ def item_events(equipment_id: int, limit: int = 25):
             (equipment_id, limit),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+@app.get("/api/events/export")
+def export_events(equipment_id: Optional[int] = None):
+    """Full event log as a downloadable CSV, for reporting or an audit trail."""
+    with db() as conn:
+        query = (
+            "SELECT e.created_at, q.name AS equipment_name, e.action, e.holder, e.note"
+            " FROM events e JOIN equipment q ON q.id = e.equipment_id"
+        )
+        if equipment_id is not None:
+            get_item(conn, equipment_id)
+            rows = conn.execute(query + " WHERE e.equipment_id = ? ORDER BY e.id", (equipment_id,)).fetchall()
+        else:
+            rows = conn.execute(query + " ORDER BY e.id").fetchall()
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["timestamp_utc", "equipment", "action", "holder", "note"])
+    for r in rows:
+        writer.writerow([r["created_at"], r["equipment_name"], r["action"], r["holder"] or "", r["note"] or ""])
+
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="recorder-tracker-events.csv"'},
+    )
 
 
 # ---------- reservations ----------

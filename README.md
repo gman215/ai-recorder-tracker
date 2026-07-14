@@ -4,7 +4,9 @@ A tiny self-hosted web app for tracking who has the team's AI recorders (or any 
 
 ## Features
 
-- **Equipment tab** — a searchable, filterable table: one row per item with status chip, holder, relative due dates ("due in 2d", "3d overdue"), and upcoming-reservation chips. Status pills with live counts (All / Available / Out / Overdue / Unavailable) double as filters; overdue items sort to the top. Row actions: one primary button per state plus an overflow menu (reserve ahead, history, mark unavailable, delete).
+- **Equipment tab** — a searchable, filterable table: one row per item with status chip, holder, relative due dates ("due in 2d", "3d overdue"), and upcoming-reservation chips. Status pills with live counts (All / Available / Out / Overdue / Unavailable) double as filters; overdue items sort to the top. Row actions: one primary button per state plus an overflow menu (rename, reserve ahead, history, mark unavailable, delete).
+- **Rename equipment** — fix a typo or relabel an item without deleting and re-adding it (which would also wipe its history).
+- **Export CSV** — the full event log (or one item's, via `?equipment_id=`) as a downloadable CSV for reporting or an audit trail.
 - **Reservations** — one unified **Reserve** flow: leave "From" as now and the item is checked out immediately; pick a future start to book ahead (future bookings need an end time). The dialog remembers your name and offers duration presets (end of day / +1 day / +3 days / +1 week). Overlapping reservations are rejected, a checkout that would run into someone else's reservation is rejected, and checking out during your own reservation fulfills (consumes) it.
 - **Timeline tab** — a resource timeline (Gantt-style): one row per item, 4 visible weeks, colored bars for checkouts (amber), reservations (blue), and unavailable periods (red). Weekend shading, a today/now marker, dashed edges for open-ended spans, muted bars for past history. Click a bar for details; navigate by week.
 - State transitions are enforced server-side (you can't check out something that's already out; marking unavailable requires a reason; a checked-out item must be checked in before deletion). Status changes and the event log are written in the same SQLite transaction, so they can never disagree.
@@ -44,12 +46,14 @@ recorder.db         SQLite database (created at first run)
 |---|---|---|
 | GET | `/api/equipment` | List all equipment with current status |
 | POST | `/api/equipment` | Add an item `{name}` |
+| PATCH | `/api/equipment/{id}` | Rename an item `{name}` |
 | DELETE | `/api/equipment/{id}` | Delete an item (refused while checked out) |
 | POST | `/api/equipment/{id}/checkout` | `{holder, expected_return_at?, note?}` |
 | POST | `/api/equipment/{id}/checkin` | `{note?}` |
 | POST | `/api/equipment/{id}/unavailable` | `{note}` — reason required |
 | POST | `/api/equipment/{id}/available` | `{note?}` |
 | GET | `/api/equipment/{id}/events?limit=25` | Recent history for one item |
+| GET | `/api/events/export?equipment_id=` | Full event log as a CSV download |
 | GET | `/api/reservations?equipment_id=` | Upcoming reservations |
 | POST | `/api/equipment/{id}/reservations` | `{holder, start_at, end_at, note?}` — book a future slot |
 | DELETE | `/api/reservations/{id}` | Cancel a reservation |

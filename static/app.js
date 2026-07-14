@@ -187,7 +187,7 @@ function actionsHtml(item) {
     checked_out: `<button class="btn primary sm" data-action="checkin" data-id="${item.id}" data-name="${n}">Check in</button>`,
     unavailable: `<button class="btn primary sm" data-action="available" data-id="${item.id}" data-name="${n}">Mark available</button>`,
   }[item.status];
-  const extra = [];
+  const extra = [`<button data-action="rename" data-id="${item.id}" data-name="${n}">Rename</button>`];
   if (item.status !== "available") extra.push(`<button data-action="reserve" data-id="${item.id}" data-name="${n}">Reserve ahead</button>`);
   extra.push(`<button data-action="history" data-id="${item.id}" data-name="${n}">History</button>`);
   if (item.status === "available") extra.push(`<button data-action="unavailable" data-id="${item.id}" data-name="${n}">Mark unavailable</button>`);
@@ -266,6 +266,8 @@ async function handleAction(action, id, name) {
   try {
     if (action === "reserve") {
       openReserveDialog(id, name);
+    } else if (action === "rename") {
+      openRenameDialog(id, name);
     } else if (action === "checkin") {
       await api(`/api/equipment/${id}/checkin`, { method: "POST", body: JSON.stringify({}) });
       toast(`${name} checked in.`);
@@ -374,6 +376,26 @@ $("#reserve-form").addEventListener("submit", async (e) => {
     }
     localStorage.setItem("rt-holder", holder);
     $("#reserve-dialog").close();
+    await refreshEquipment();
+  } catch (err) {
+    toast(err.message, true);
+  }
+});
+
+let renameTargetId = null;
+function openRenameDialog(id, name) {
+  renameTargetId = id;
+  $("#rename-name").value = name;
+  $("#rename-dialog").showModal();
+}
+
+$("#rename-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = $("#rename-name").value.trim();
+  try {
+    await api(`/api/equipment/${renameTargetId}`, { method: "PATCH", body: JSON.stringify({ name }) });
+    $("#rename-dialog").close();
+    toast("Renamed.");
     await refreshEquipment();
   } catch (err) {
     toast(err.message, true);

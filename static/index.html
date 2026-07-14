@@ -21,6 +21,7 @@
     <div class="toolbar">
       <input id="search" type="search" placeholder="Search equipment or holder…">
       <div id="status-pills" class="pills"></div>
+      <a id="export-csv" class="btn" href="/api/events/export" download>Export CSV</a>
       <form id="add-form" class="add-form">
         <input id="add-name" type="text" placeholder="New equipment name" maxlength="200" required>
         <button type="submit" class="btn primary">Add</button>
@@ -78,6 +79,18 @@
     <div class="dialog-actions">
       <button type="button" class="btn" data-close>Cancel</button>
       <button type="submit" class="btn primary">Reserve</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Rename dialog -->
+<dialog id="rename-dialog">
+  <form id="rename-form" method="dialog">
+    <h3>Rename equipment</h3>
+    <label>Name <input id="rename-name" type="text" maxlength="200" required></label>
+    <div class="dialog-actions">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="submit" class="btn primary">Save</button>
     </div>
   </form>
 </dialog>
