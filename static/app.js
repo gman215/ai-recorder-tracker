@@ -528,15 +528,24 @@ function busyByDay(firstVisible, lastVisible) {
   return map;
 }
 
-// How much of a calendar day one interval actually consumes for its item:
-//   "full"    — still ongoing/unresolved (unknown end), or spans multiple
-//               calendar days, so it monopolizes every day it touches.
-//   "partial" — a closed, same-day booking (e.g. a two-hour meeting
-//               reservation, or a checkout returned same day) — it only
-//               blocks part of the day, not all of it.
-function intervalLevel(iv) {
+// How much of one specific calendar day (from dayStart 00:00 to dayEnd next
+// midnight) an interval actually consumes for its item:
+//   "full"    — still ongoing/unresolved (unknown end so treated
+//               conservatively), or it covers this day from its very start
+//               to its very end (a multi-day span's fully-enclosed days, or
+//               an exact all-day booking).
+//   "partial" — anything less than the whole day — a two-hour meeting
+//               reservation, a checkout returned the same day, or even the
+//               first/last day of a multi-day span if it doesn't start
+//               right at midnight or end right at the next one (e.g. an
+//               overnight checkout from 1pm to 11am the next morning only
+//               partially touches each of those two days, not all of
+//               either).
+function intervalLevel(iv, dayStart, dayEnd) {
   if (iv.open) return "full";
-  return dayKey(new Date(iv.start)) === dayKey(new Date(iv.end)) ? "partial" : "full";
+  const start = new Date(iv.start);
+  const end = new Date(iv.end);
+  return (start <= dayStart && end >= dayEnd) ? "full" : "partial";
 }
 
 function renderCalendar() {
@@ -564,12 +573,14 @@ function renderCalendar() {
   for (let d = new Date(firstVisible); d <= lastVisible; d.setDate(d.getDate() + 1)) {
     const key = dayKey(d);
     const entries = busy.get(key) || [];
+    const dayStart = new Date(d); dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(dayStart.getTime() + DAY_MS);
 
     // One item can have several bookings the same day (e.g. two separate
     // meeting-length reservations) — take the worse of its levels that day.
     const levelByItem = new Map();
     for (const iv of entries) {
-      const lvl = intervalLevel(iv);
+      const lvl = intervalLevel(iv, dayStart, dayEnd);
       if (levelByItem.get(iv.equipment_id) !== "full") levelByItem.set(iv.equipment_id, lvl);
     }
     const busyCount = levelByItem.size;
