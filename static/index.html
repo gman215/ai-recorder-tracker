@@ -11,7 +11,7 @@
   <h1>🎙️ Recorder Tracker</h1>
   <nav>
     <button id="tab-equipment" class="tab active">Equipment</button>
-    <button id="tab-timeline" class="tab">Timeline</button>
+    <button id="tab-calendar" class="tab">Calendar</button>
   </nav>
 </header>
 
@@ -40,24 +40,30 @@
     </div>
   </section>
 
-  <!-- Timeline view -->
-  <section id="view-timeline" class="hidden">
-    <div class="tl-controls">
-      <div class="tl-nav">
-        <button id="tl-prev" class="btn" title="Back one week">‹</button>
-        <button id="tl-today" class="btn">Today</button>
-        <button id="tl-next" class="btn" title="Forward one week">›</button>
-        <h2 id="tl-range"></h2>
+  <!-- Calendar view -->
+  <section id="view-calendar" class="hidden">
+    <div class="cal-controls">
+      <div class="cal-nav">
+        <button id="cal-prev" class="btn" title="Previous month">‹</button>
+        <button id="cal-today" class="btn">Today</button>
+        <button id="cal-next" class="btn" title="Next month">›</button>
+        <h2 id="cal-title"></h2>
       </div>
-      <div class="tl-legend">
-        <span><i class="dot dot-out"></i> Checked out</span>
-        <span><i class="dot dot-res"></i> Reserved</span>
-        <span><i class="dot dot-unav"></i> Unavailable</span>
-      </div>
+      <label class="cal-filter">
+        Show:
+        <select id="cal-filter">
+          <option value="">All equipment</option>
+        </select>
+      </label>
     </div>
-    <div class="tl-wrap"><div id="timeline" class="tl-grid"></div></div>
-    <p id="timeline-empty" class="empty hidden">No equipment yet — add items on the Equipment tab.</p>
-    <div id="tl-details" class="detail-panel hidden"></div>
+    <div class="cal-legend">
+      <span><i class="dot dot-available"></i> Available</span>
+      <span><i class="dot dot-partial"></i> Partially booked</span>
+      <span><i class="dot dot-full"></i> Fully unavailable</span>
+      <span>· Future reservations count as booked</span>
+    </div>
+    <div id="calendar-grid" class="cal-grid"></div>
+    <div id="day-details" class="day-details hidden"></div>
   </section>
 </main>
 

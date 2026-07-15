@@ -74,17 +74,14 @@ function effStatus(item) {
 
 function showTab(name) {
   $("#tab-equipment").classList.toggle("active", name === "equipment");
-  $("#tab-timeline").classList.toggle("active", name === "timeline");
+  $("#tab-calendar").classList.toggle("active", name === "calendar");
   $("#view-equipment").classList.toggle("hidden", name !== "equipment");
-  $("#view-timeline").classList.toggle("hidden", name !== "timeline");
-  // The timeline needs more horizontal room than the equipment table to
-  // keep day columns legible, so it gets a wider content area.
-  document.querySelector("main").classList.toggle("wide", name === "timeline");
-  if (name === "timeline") refreshTimeline();
+  $("#view-calendar").classList.toggle("hidden", name !== "calendar");
+  if (name === "calendar") refreshCalendar();
 }
 
 $("#tab-equipment").addEventListener("click", () => showTab("equipment"));
-$("#tab-timeline").addEventListener("click", () => showTab("timeline"));
+$("#tab-calendar").addEventListener("click", () => showTab("calendar"));
 
 // ---------- equipment table ----------
 
@@ -443,164 +440,187 @@ async function openHistoryDialog(id, name) {
   $("#history-dialog").showModal();
 }
 
-// ---------- timeline ----------
+// ---------- calendar ----------
 
-const TL_DAYS = 14;
+let calYear, calMonth; // calMonth is 0-based
+let calData = null;    // last /api/calendar response
+let selectedDayKey = null;
 
-function startOfWeek(d) {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); // back to Monday
-  return x;
+{
+  const now = new Date();
+  calYear = now.getFullYear();
+  calMonth = now.getMonth();
 }
 
-let tlStart = startOfWeek(new Date());
-let tlData = null; // { equipment: [...], byItem: Map(id -> intervals) }
-
-$("#tl-prev").addEventListener("click", () => { shiftTimeline(-7); });
-$("#tl-next").addEventListener("click", () => { shiftTimeline(7); });
-$("#tl-today").addEventListener("click", () => {
-  tlStart = startOfWeek(new Date());
-  renderTimeline();
+$("#cal-prev").addEventListener("click", () => shiftMonth(-1));
+$("#cal-next").addEventListener("click", () => shiftMonth(1));
+$("#cal-today").addEventListener("click", () => {
+  const now = new Date();
+  calYear = now.getFullYear();
+  calMonth = now.getMonth();
+  selectedDayKey = null;
+  renderCalendar();
 });
+$("#cal-filter").addEventListener("change", refreshCalendar);
 
-function shiftTimeline(days) {
-  tlStart = new Date(tlStart.getTime() + days * DAY_MS);
-  renderTimeline();
+function shiftMonth(delta) {
+  const d = new Date(calYear, calMonth + delta, 1);
+  calYear = d.getFullYear();
+  calMonth = d.getMonth();
+  selectedDayKey = null;
+  renderCalendar();
 }
 
-async function refreshTimeline() {
+async function refreshCalendar() {
+  const filter = $("#cal-filter").value;
   try {
-    const [equipment, cal] = await Promise.all([
-      api("/api/equipment"),
-      api("/api/calendar"),
-    ]);
-    const byItem = new Map();
-    for (const iv of cal.intervals) {
-      if (!byItem.has(iv.equipment_id)) byItem.set(iv.equipment_id, []);
-      byItem.get(iv.equipment_id).push(iv);
-    }
-    tlData = { equipment, byItem };
-    renderTimeline();
+    calData = await api("/api/calendar" + (filter ? `?equipment_id=${filter}` : ""));
+    updateFilterOptions(calData.equipment, filter);
+    renderCalendar();
   } catch (err) {
     toast(err.message, true);
   }
 }
 
-// Resolve an interval to concrete start/end dates for display.
-// Returns null if it shouldn't be drawn.
-function barSpan(iv, winEnd) {
-  const now = new Date();
-  const start = new Date(iv.start);
-  let end, ongoing = false;
-  if (iv.type === "checked_out") {
-    if (iv.end) {
-      end = new Date(iv.end);
-      if (iv.open && end < now) end = now; // overdue: still out, keep blocking
-    } else if (iv.open) {
-      end = now; // out with no expected return: ongoing up to now
-      ongoing = true;
+function updateFilterOptions(equipment, current) {
+  const sel = $("#cal-filter");
+  sel.innerHTML = '<option value="">All equipment</option>' +
+    equipment.map((e) => `<option value="${e.id}"${String(e.id) === current ? " selected" : ""}>${escapeHtml(e.name)}</option>`).join("");
+}
+
+// "YYYY-MM-DD" local-date key for a Date.
+function dayKey(date) {
+  const p = (n) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}`;
+}
+
+// Expand intervals into a map of dayKey -> [{equipment_id, ...interval}] for
+// the visible range. Returns entries deduped per equipment per day.
+function busyByDay(firstVisible, lastVisible) {
+  const map = new Map();
+  if (!calData) return map;
+  const today = new Date();
+
+  for (const iv of calData.intervals) {
+    let start = new Date(iv.start);
+    let end;
+    if (iv.type === "checked_out" && iv.end === null) {
+      end = start; // no expected return: only the checkout day
+    } else if (iv.end === null) {
+      end = lastVisible; // ongoing unavailable: through end of visible range
     } else {
-      end = start;
+      end = new Date(iv.end);
+      // Still checked out past the expected return: keep blocking through today.
+      if (iv.open && iv.type === "checked_out" && end < today) end = today;
     }
-  } else if (iv.type === "unavailable" && iv.end === null) {
-    end = winEnd; // still unavailable: fills the visible future
-    ongoing = true;
-  } else {
-    end = new Date(iv.end);
+    if (end < start) end = start;
+
+    // Clamp to visible range, then walk days.
+    const from = start < firstVisible ? new Date(firstVisible) : new Date(start);
+    from.setHours(0, 0, 0, 0);
+    const until = end > lastVisible ? lastVisible : end;
+    for (let d = from; d <= until; d.setDate(d.getDate() + 1)) {
+      const key = dayKey(d);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(iv);
+    }
   }
-  if (end <= start) end = new Date(start.getTime() + 3600000); // min 1h so it's visible
-  return { start, end, ongoing };
+  return map;
 }
 
-function renderTimeline() {
-  if (!tlData) return;
-  const winEnd = new Date(tlStart.getTime() + TL_DAYS * DAY_MS);
-  const now = new Date();
-  $("#tl-range").textContent = `${fmtDate(tlStart)} – ${fmtDate(new Date(winEnd.getTime() - DAY_MS))}`;
+function renderCalendar() {
+  if (!calData) return;
+  const monthName = new Date(calYear, calMonth, 1).toLocaleString(undefined, { month: "long", year: "numeric" });
+  $("#cal-title").textContent = monthName;
 
-  const grid = $("#timeline");
-  const hasItems = tlData.equipment.length > 0;
-  $("#timeline-empty").classList.toggle("hidden", hasItems);
-  grid.classList.toggle("hidden", !hasItems);
-  if (!hasItems) { grid.innerHTML = ""; return; }
+  const firstOfMonth = new Date(calYear, calMonth, 1);
+  const firstVisible = new Date(firstOfMonth);
+  firstVisible.setDate(1 - firstOfMonth.getDay()); // back up to Sunday
+  const lastOfMonth = new Date(calYear, calMonth + 1, 0);
+  const lastVisible = new Date(lastOfMonth);
+  lastVisible.setDate(lastOfMonth.getDate() + (6 - lastOfMonth.getDay()));
+  lastVisible.setHours(23, 59, 59, 999);
 
-  const todayKey = new Date().toDateString();
-  let html = `<div class="tl-head tl-corner"></div>`;
-  for (let i = 0; i < TL_DAYS; i++) {
-    const d = new Date(tlStart.getTime() + i * DAY_MS);
-    const cls = [
-      "tl-head",
-      d.getDay() === 0 || d.getDay() === 6 ? "wknd" : "",
-      d.toDateString() === todayKey ? "today" : "",
+  const busy = busyByDay(firstVisible, lastVisible);
+  const totalEquipment = calData.equipment.length;
+  const filterActive = $("#cal-filter").value !== "";
+  const denominator = filterActive ? 1 : totalEquipment;
+  const todayKey = dayKey(new Date());
+
+  const dows = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  let html = dows.map((d) => `<div class="cal-dow">${d}</div>`).join("");
+
+  for (let d = new Date(firstVisible); d <= lastVisible; d.setDate(d.getDate() + 1)) {
+    const key = dayKey(d);
+    const entries = busy.get(key) || [];
+    const busyCount = new Set(entries.map((e) => e.equipment_id)).size;
+
+    let status = "";
+    if (denominator > 0) {
+      if (busyCount === 0) status = "status-available";
+      else if (busyCount >= denominator) status = "status-full";
+      else status = "status-partial";
+    }
+    const classes = [
+      "cal-day", status,
+      d.getMonth() !== calMonth ? "outside" : "",
+      key === todayKey ? "today" : "",
+      key === selectedDayKey ? "selected" : "",
     ].filter(Boolean).join(" ");
-    html += `<div class="${cls}">${"MTWTFSS"[(d.getDay() + 6) % 7]}<br>${d.getDate()}</div>`;
+
+    html += `
+      <div class="${classes}" data-day="${key}">
+        <span class="cal-day-num">${d.getDate()}</span>
+        ${busyCount ? `<span class="cal-day-count">${busyCount} busy</span>` : ""}
+      </div>`;
   }
 
-  const pct = (date) => ((date - tlStart) / (TL_DAYS * DAY_MS)) * 100;
-
-  // A single thin line marks "now" — weekends/today are conveyed by header
-  // text styling only, so rows stay plain white and bars are the only color.
-  let decor = "";
-  if (now >= tlStart && now < winEnd) {
-    decor += `<div class="tl-now" style="left:${pct(now)}%"></div>`;
-  }
-
-  tlData.equipment.forEach((eq, idx) => {
-    const st = effStatus(eq);
-    html += `<div class="tl-name"><i class="dot st-${st}" title="${STATUS_LABELS[st]}"></i>${escapeHtml(eq.name)}</div>`;
-    let bars = "";
-    for (const iv of tlData.byItem.get(eq.id) || []) {
-      const span = barSpan(iv, winEnd);
-      if (!span || span.end <= tlStart || span.start >= winEnd) continue;
-      const left = Math.max(0, pct(span.start));
-      const width = Math.min(100, pct(span.end)) - left;
-      const past = !iv.open && span.end < now && iv.type !== "reserved";
-      const label = iv.type === "unavailable" ? (iv.note || "unavailable") : (iv.holder || "");
-      // A bar under ~half a day wide can't fit readable text — render it as
-      // a fixed-size pin (holder's initial) instead of a truncated word.
-      const compact = (span.end - span.start) / DAY_MS < 0.4;
-      const clsParts = ["tl-bar", iv.type];
-      if (past) clsParts.push("done");
-      if (compact) clsParts.push("compact"); else if (span.ongoing) clsParts.push("ongoing");
-      const style = compact ? `left:${left}%` : `left:${left}%;width:${width}%`;
-      const content = compact ? escapeHtml((label || "?").trim().charAt(0).toUpperCase()) : escapeHtml(label);
-      bars += `<div class="${clsParts.join(" ")}" style="${style}"
-        data-iv="${escapeHtml(JSON.stringify(iv))}"
-        title="${escapeHtml(eq.name)} · ${escapeHtml(label)}">${content}</div>`;
-    }
-    html += `<div class="tl-track">${decor}${bars}</div>`;
-  });
-
+  const grid = $("#calendar-grid");
   grid.innerHTML = html;
-
-  grid.querySelectorAll(".tl-bar").forEach((bar) => {
-    bar.addEventListener("click", () => renderTlDetails(JSON.parse(bar.dataset.iv)));
+  grid.querySelectorAll(".cal-day").forEach((cell) => {
+    cell.addEventListener("click", () => {
+      selectedDayKey = cell.dataset.day;
+      renderCalendar();
+      renderDayDetails(busy.get(selectedDayKey) || []);
+    });
   });
-  $("#tl-details").classList.add("hidden");
+
+  if (selectedDayKey) renderDayDetails(busy.get(selectedDayKey) || []);
+  else $("#day-details").classList.add("hidden");
 }
 
-function renderTlDetails(iv) {
-  const el = $("#tl-details");
+function renderDayDetails(entries) {
+  const el = $("#day-details");
   el.classList.remove("hidden");
-  const typeLabel = { checked_out: "Checked out", reserved: "Reserved", unavailable: "Unavailable" }[iv.type];
-  const lines = [];
-  if (iv.holder) lines.push(`${iv.type === "reserved" ? "Reserved by" : "With"} <strong>${escapeHtml(iv.holder)}</strong>`);
-  let range = fmtDateTime(iv.start);
-  if (iv.end) {
-    range += ` → ${fmtDateTime(iv.end)}`;
-    if (iv.type === "checked_out" && iv.open) {
-      range += new Date(iv.end) < new Date()
-        ? ` <strong class="late">(${relSpan(iv.end)} overdue)</strong>`
-        : ` (due in ${relSpan(iv.end)})`;
-    }
-  } else if (iv.open) {
-    range += iv.type === "unavailable" ? " → ongoing" : " → no expected return";
+  const dateLabel = new Date(selectedDayKey + "T00:00:00").toLocaleDateString(undefined, {
+    weekday: "long", month: "long", day: "numeric", year: "numeric",
+  });
+
+  if (!entries.length) {
+    el.innerHTML = `<h3>${dateLabel}</h3><p class="all-free">All equipment available. 🎉</p>`;
+    return;
   }
-  lines.push(range);
-  if (iv.note) lines.push(`<span class="dim">${escapeHtml(iv.note)}</span>`);
-  el.innerHTML = `<h3>${escapeHtml(iv.equipment_name)} — ${typeLabel}</h3>
-    ${lines.map((l) => `<p>${l}</p>`).join("")}`;
+
+  const items = entries.map((iv) => {
+    if (iv.type === "checked_out") {
+      const range = iv.end
+        ? `${fmtDateTime(iv.start)} → ${fmtDateTime(iv.end)}${iv.open ? " (expected)" : ""}`
+        : `${fmtDateTime(iv.start)} (no expected return)`;
+      return `<li><strong>${escapeHtml(iv.equipment_name)}</strong> — checked out by ${escapeHtml(iv.holder)}<br>
+        <small>${range}${iv.note ? ` · ${escapeHtml(iv.note)}` : ""}</small></li>`;
+    }
+    if (iv.type === "reserved") {
+      return `<li><strong>${escapeHtml(iv.equipment_name)}</strong> — reserved by ${escapeHtml(iv.holder)}<br>
+        <small>${fmtDateTime(iv.start)} → ${fmtDateTime(iv.end)}${iv.note ? ` · ${escapeHtml(iv.note)}` : ""}</small></li>`;
+    }
+    const range = iv.end
+      ? `${fmtDateTime(iv.start)} → ${fmtDateTime(iv.end)}`
+      : `since ${fmtDateTime(iv.start)} (ongoing)`;
+    return `<li><strong>${escapeHtml(iv.equipment_name)}</strong> — unavailable: ${escapeHtml(iv.note || "no reason given")}<br>
+      <small>${range}</small></li>`;
+  }).join("");
+
+  el.innerHTML = `<h3>${dateLabel}</h3><ul>${items}</ul>`;
 }
 
 // ---------- init ----------

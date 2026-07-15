@@ -8,7 +8,7 @@ A tiny self-hosted web app for tracking who has the team's AI recorders (or any 
 - **Rename equipment** — fix a typo or relabel an item without deleting and re-adding it (which would also wipe its history).
 - **Export CSV** — the full event log (or one item's, via `?equipment_id=`) as a downloadable CSV for reporting or an audit trail.
 - **Reservations** — one unified **Reserve** flow: leave "From" as now and the item is checked out immediately; pick a future start to book ahead (future bookings need an end time). The dialog remembers your name and offers duration presets (end of day / +1 day / +3 days / +1 week). Overlapping reservations are rejected, a checkout that would run into someone else's reservation is rejected, and checking out during your own reservation fulfills (consumes) it.
-- **Timeline tab** — a resource timeline (Gantt-style): one row per item, 4 visible weeks, colored bars for checkouts (amber), reservations (blue), and unavailable periods (red). Weekend shading, a today/now marker, dashed edges for open-ended spans, muted bars for past history. Click a bar for details; navigate by week.
+- **Calendar tab** — month view of availability across all equipment (or filtered to one item). Days are color-coded: green = everything free, amber = partially booked, red = everything busy. Click a day to see exactly which items are out/unavailable/reserved and who has them.
 - State transitions are enforced server-side (you can't check out something that's already out; marking unavailable requires a reason; a checked-out item must be checked in before deletion). Status changes and the event log are written in the same SQLite transaction, so they can never disagree.
 
 ## Setup & run
@@ -61,7 +61,7 @@ recorder.db         SQLite database (created at first run)
 
 Invalid transitions return `409` with a human-readable `detail` message that the UI surfaces as a toast.
 
-Timeline semantics (from `/api/calendar` intervals): a checkout spans `checked_out_at → expected_return_at` (or the actual check-in time once returned). A checkout with **no** expected return draws up to now, not into the future — but an item that's overdue keeps blocking through today. An unavailable item spans from when it was marked unavailable until it's marked available again (fills the visible future if it hasn't been). Reservations block their booked `start_at → end_at` range; back-to-back bookings (one ending exactly when the next starts) are allowed.
+Calendar semantics (from `/api/calendar` intervals): a checkout spans `checked_out_at → expected_return_at` (or the actual check-in time once returned). A checkout with **no** expected return shows only on its checkout day rather than blocking the calendar forever — but an item that's overdue keeps blocking through today. An unavailable item spans from when it was marked unavailable until it's marked available again (ongoing if it hasn't been). Reservations block their booked `start_at → end_at` range; back-to-back bookings (one ending exactly when the next starts) are allowed.
 
 All timestamps are stored as UTC ISO 8601 and rendered in the viewer's local timezone by the browser. Set `RECORDER_DB=/path/to/file.db` to override where the database lives.
 
@@ -71,3 +71,4 @@ All timestamps are stored as UTC ISO 8601 and rendered in the viewer's local tim
 - **Auth** — holder is free text today, which is fine for a trusting team. Next step would be lightweight magic-link or OAuth (e.g. `authlib`) and deriving the holder from the session instead of a text field.
 - **Postgres migration** — the SQL is deliberately plain. Swapping `sqlite3` for `asyncpg`/SQLAlchemy is mostly mechanical; the event log's append-only design ports directly. Do this before multiple uvicorn workers, since SQLite writes are single-process here.
 - **Notifications** — a small scheduled job could ping a Slack webhook when an item goes overdue (`expected_return_at < now` and still checked out).
+- **Resource timeline** — a month calendar answers "what's happening on day X," which is the more common question at a handful of items. If the fleet grows into the dozens, a Gantt-style row-per-item timeline (one existed in an earlier version of this app, in git history) answers "when is item Y next free" better — worth revisiting at that scale.
