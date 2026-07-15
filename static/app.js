@@ -528,6 +528,17 @@ function busyByDay(firstVisible, lastVisible) {
   return map;
 }
 
+// How much of a calendar day one interval actually consumes for its item:
+//   "full"    — still ongoing/unresolved (unknown end), or spans multiple
+//               calendar days, so it monopolizes every day it touches.
+//   "partial" — a closed, same-day booking (e.g. a two-hour meeting
+//               reservation, or a checkout returned same day) — it only
+//               blocks part of the day, not all of it.
+function intervalLevel(iv) {
+  if (iv.open) return "full";
+  return dayKey(new Date(iv.start)) === dayKey(new Date(iv.end)) ? "partial" : "full";
+}
+
 function renderCalendar() {
   if (!calData) return;
   const monthName = new Date(calYear, calMonth, 1).toLocaleString(undefined, { month: "long", year: "numeric" });
@@ -553,12 +564,21 @@ function renderCalendar() {
   for (let d = new Date(firstVisible); d <= lastVisible; d.setDate(d.getDate() + 1)) {
     const key = dayKey(d);
     const entries = busy.get(key) || [];
-    const busyCount = new Set(entries.map((e) => e.equipment_id)).size;
+
+    // One item can have several bookings the same day (e.g. two separate
+    // meeting-length reservations) — take the worse of its levels that day.
+    const levelByItem = new Map();
+    for (const iv of entries) {
+      const lvl = intervalLevel(iv);
+      if (levelByItem.get(iv.equipment_id) !== "full") levelByItem.set(iv.equipment_id, lvl);
+    }
+    const busyCount = levelByItem.size;
+    const fullCount = [...levelByItem.values()].filter((lvl) => lvl === "full").length;
 
     let status = "";
     if (denominator > 0) {
       if (busyCount === 0) status = "status-available";
-      else if (busyCount >= denominator) status = "status-full";
+      else if (fullCount >= denominator) status = "status-full";
       else status = "status-partial";
     }
     const classes = [

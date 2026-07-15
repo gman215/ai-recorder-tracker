@@ -63,6 +63,8 @@ Invalid transitions return `409` with a human-readable `detail` message that the
 
 Calendar semantics (from `/api/calendar` intervals): a checkout spans `checked_out_at → expected_return_at` (or the actual check-in time once returned). A checkout with **no** expected return shows only on its checkout day rather than blocking the calendar forever — but an item that's overdue keeps blocking through today. An unavailable item spans from when it was marked unavailable until it's marked available again (ongoing if it hasn't been). Reservations block their booked `start_at → end_at` range; back-to-back bookings (one ending exactly when the next starts) are allowed.
 
+Day coloring accounts for how much of the day is actually consumed, not just whether an item was touched: an ongoing/unresolved booking (still checked out, no known return, or still marked unavailable) or one spanning multiple calendar days paints the day "fully unavailable." A closed, same-day booking — a two-hour meeting reservation, a checkout returned same day — only paints it "partially booked," even if there are several such bookings that day, so a quick meeting-length reservation doesn't make the item look booked all day.
+
 All timestamps are stored as UTC ISO 8601 and rendered in the viewer's local timezone by the browser. Set `RECORDER_DB=/path/to/file.db` to override where the database lives.
 
 ## Where this could grow
