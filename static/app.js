@@ -326,6 +326,8 @@ function openReserveDialog(id, name, startAt, endAt) {
 }
 
 // Duration presets fill "Until" relative to the chosen "From" time.
+// "Nh" = N hours (e.g. "1h", "2h" for quick meeting-length bookings),
+// "eod" = end of that day, a bare number = that many days.
 $("#reserve-presets").addEventListener("click", (e) => {
   const preset = e.target.dataset?.preset;
   if (!preset) return;
@@ -335,6 +337,8 @@ $("#reserve-presets").addEventListener("click", (e) => {
     end = new Date(base);
     end.setHours(18, 0, 0, 0);
     if (end <= base) end.setDate(end.getDate() + 1); // already past 6 PM
+  } else if (preset.endsWith("h")) {
+    end = new Date(base.getTime() + Number(preset.slice(0, -1)) * HOUR_MS);
   } else {
     end = new Date(base.getTime() + Number(preset) * DAY_MS);
   }
