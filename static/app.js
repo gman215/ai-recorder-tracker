@@ -445,7 +445,7 @@ async function openHistoryDialog(id, name) {
 
 // ---------- timeline ----------
 
-const TL_DAYS = 28;
+const TL_DAYS = 14;
 
 function startOfWeek(d) {
   const x = new Date(d);
@@ -539,16 +539,9 @@ function renderTimeline() {
 
   const pct = (date) => ((date - tlStart) / (TL_DAYS * DAY_MS)) * 100;
 
-  // weekend + today shading and the now-line, shared per track
+  // A single thin line marks "now" — weekends/today are conveyed by header
+  // text styling only, so rows stay plain white and bars are the only color.
   let decor = "";
-  for (let i = 0; i < TL_DAYS; i++) {
-    const d = new Date(tlStart.getTime() + i * DAY_MS);
-    if (d.toDateString() === todayKey) {
-      decor += `<div class="tl-shade today" style="left:${(i / TL_DAYS) * 100}%;width:${100 / TL_DAYS}%"></div>`;
-    } else if (d.getDay() === 0 || d.getDay() === 6) {
-      decor += `<div class="tl-shade" style="left:${(i / TL_DAYS) * 100}%;width:${100 / TL_DAYS}%"></div>`;
-    }
-  }
   if (now >= tlStart && now < winEnd) {
     decor += `<div class="tl-now" style="left:${pct(now)}%"></div>`;
   }
