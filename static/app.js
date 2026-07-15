@@ -77,6 +77,9 @@ function showTab(name) {
   $("#tab-timeline").classList.toggle("active", name === "timeline");
   $("#view-equipment").classList.toggle("hidden", name !== "equipment");
   $("#view-timeline").classList.toggle("hidden", name !== "timeline");
+  // The timeline needs more horizontal room than the equipment table to
+  // keep day columns legible, so it gets a wider content area.
+  document.querySelector("main").classList.toggle("wide", name === "timeline");
   if (name === "timeline") refreshTimeline();
 }
 
@@ -560,11 +563,18 @@ function renderTimeline() {
       const left = Math.max(0, pct(span.start));
       const width = Math.min(100, pct(span.end)) - left;
       const past = !iv.open && span.end < now && iv.type !== "reserved";
-      const cls = ["tl-bar", iv.type, past ? "done" : "", span.ongoing ? "ongoing" : ""].filter(Boolean).join(" ");
       const label = iv.type === "unavailable" ? (iv.note || "unavailable") : (iv.holder || "");
-      bars += `<div class="${cls}" style="left:${left}%;width:${width}%"
+      // A bar under ~half a day wide can't fit readable text — render it as
+      // a fixed-size pin (holder's initial) instead of a truncated word.
+      const compact = (span.end - span.start) / DAY_MS < 0.4;
+      const clsParts = ["tl-bar", iv.type];
+      if (past) clsParts.push("done");
+      if (compact) clsParts.push("compact"); else if (span.ongoing) clsParts.push("ongoing");
+      const style = compact ? `left:${left}%` : `left:${left}%;width:${width}%`;
+      const content = compact ? escapeHtml((label || "?").trim().charAt(0).toUpperCase()) : escapeHtml(label);
+      bars += `<div class="${clsParts.join(" ")}" style="${style}"
         data-iv="${escapeHtml(JSON.stringify(iv))}"
-        title="${escapeHtml(eq.name)} · ${escapeHtml(label)}">${escapeHtml(label)}</div>`;
+        title="${escapeHtml(eq.name)} · ${escapeHtml(label)}">${content}</div>`;
     }
     html += `<div class="tl-track">${decor}${bars}</div>`;
   });

@@ -33,6 +33,7 @@ nav { display: flex; gap: 0.5rem; }
 .tab.active { background: #e8eefc; color: #2456c9; font-weight: 600; }
 
 main { max-width: 1100px; margin: 1.5rem auto; padding: 0 1rem; }
+main.wide { max-width: 1600px; }
 
 .hidden { display: none !important; }
 .dim { color: #9aa1b0; }
@@ -224,8 +225,8 @@ tr:last-child td { border-bottom: none; }
 
 .tl-grid {
   display: grid;
-  grid-template-columns: 170px repeat(28, minmax(30px, 1fr));
-  min-width: 1050px;
+  grid-template-columns: 170px repeat(28, minmax(38px, 1fr));
+  min-width: 1200px;
 }
 
 .tl-head {
@@ -301,6 +302,18 @@ tr:last-child td { border-bottom: none; }
 .tl-bar.done { opacity: 0.4; }
 .tl-bar.ongoing { border-right: 3px dashed rgba(255, 255, 255, 0.9); }
 .tl-bar:hover { filter: brightness(0.92); }
+
+/* Near-zero-duration events (e.g. a checkout that just happened) can't fit
+   readable text at any column width — render as a fixed-size pin instead
+   of a bar that would clip mid-word. */
+.tl-bar.compact {
+  width: 22px;
+  min-width: 22px;
+  padding: 0;
+  border-radius: 50%;
+  justify-content: center;
+  box-shadow: 0 0 0 2px #fff;
+}
 
 .detail-panel {
   margin-top: 1rem;
