@@ -63,9 +63,20 @@
       <span>· Future reservations count as booked</span>
     </div>
     <div id="calendar-grid" class="cal-grid"></div>
-    <div id="day-details" class="day-details hidden"></div>
   </section>
 </main>
+
+<!-- Day booking dialog: click a calendar day to see it broken out by hour
+     and equipment, and click any free hour to book that item then. -->
+<dialog id="day-dialog" class="day-dialog">
+  <h3 id="day-dialog-title"></h3>
+  <div class="day-hours-wrap">
+    <table id="day-hours-grid" class="day-hours-grid"></table>
+  </div>
+  <div class="dialog-actions">
+    <button type="button" class="btn" data-close>Close</button>
+  </div>
+</dialog>
 
 <!-- Reserve dialog (also handles immediate checkout when From = now) -->
 <dialog id="reserve-dialog">

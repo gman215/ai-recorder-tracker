@@ -313,11 +313,14 @@ document.querySelectorAll("dialog [data-close]").forEach((btn) => {
 });
 
 let reserveTargetId = null;
-function openReserveDialog(id, name) {
+// startAt/endAt let the day-hour-grid pre-fill a specific slot; equipment-table
+// callers omit them and get the usual "From = now, Until = blank" default.
+function openReserveDialog(id, name, startAt, endAt) {
   reserveTargetId = id;
   $("#reserve-item-name").textContent = name;
   $("#reserve-form").reset();
-  $("#reserve-start").value = localVal(new Date());
+  $("#reserve-start").value = localVal(startAt || new Date());
+  $("#reserve-end").value = endAt ? localVal(endAt) : "";
   $("#reserve-holder").value = localStorage.getItem("rt-holder") || "";
   $("#reserve-dialog").showModal();
 }
@@ -612,46 +615,99 @@ function renderCalendar() {
     cell.addEventListener("click", () => {
       selectedDayKey = cell.dataset.day;
       renderCalendar();
-      renderDayDetails(busy.get(selectedDayKey) || []);
+      openDayDialog(selectedDayKey);
     });
   });
-
-  if (selectedDayKey) renderDayDetails(busy.get(selectedDayKey) || []);
-  else $("#day-details").classList.add("hidden");
 }
 
-function renderDayDetails(entries) {
-  const el = $("#day-details");
-  el.classList.remove("hidden");
-  const dateLabel = new Date(selectedDayKey + "T00:00:00").toLocaleDateString(undefined, {
+const HOUR_MS = 3600000;
+
+// Click a day to see it broken into hours, one column per equipment item —
+// busy hours show who has it, free future hours are clickable to book.
+// Always fetches its own unfiltered data, independent of the month view's
+// "Show" dropdown, so every item's real availability is visible here even
+// when the grid behind it is filtered down to one piece of equipment.
+async function openDayDialog(key) {
+  const dayStart = new Date(key + "T00:00:00");
+  const dayEnd = new Date(dayStart.getTime() + DAY_MS);
+  const now = new Date();
+
+  $("#day-dialog-title").textContent = dayStart.toLocaleDateString(undefined, {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
   });
 
-  if (!entries.length) {
-    el.innerHTML = `<h3>${dateLabel}</h3><p class="all-free">All equipment available. 🎉</p>`;
+  let data;
+  try {
+    data = await api("/api/calendar");
+  } catch (err) {
+    toast(err.message, true);
+    return;
+  }
+  const equipment = data.equipment;
+
+  const table = $("#day-hours-grid");
+  if (equipment.length === 0) {
+    table.innerHTML = '<tr><td class="empty">No equipment yet — add items on the Equipment tab.</td></tr>';
+    $("#day-dialog").showModal();
     return;
   }
 
-  const items = entries.map((iv) => {
-    if (iv.type === "checked_out") {
-      const range = iv.end
-        ? `${fmtDateTime(iv.start)} → ${fmtDateTime(iv.end)}${iv.open ? " (expected)" : ""}`
-        : `${fmtDateTime(iv.start)} (no expected return)`;
-      return `<li><strong>${escapeHtml(iv.equipment_name)}</strong> — checked out by ${escapeHtml(iv.holder)}<br>
-        <small>${range}${iv.note ? ` · ${escapeHtml(iv.note)}` : ""}</small></li>`;
+  // Effective occupied ranges per item for this specific day — same
+  // open-ended/overdue handling as the month grid, just clipped to 24h.
+  const rangesByItem = new Map();
+  for (const iv of data.intervals) {
+    let start = new Date(iv.start);
+    let end;
+    if (iv.type === "checked_out" && iv.end === null) {
+      end = new Date(start.getTime() + HOUR_MS); // marker: at least show the checkout hour
+    } else if (iv.end === null) {
+      end = dayEnd; // ongoing unavailable
+    } else {
+      end = new Date(iv.end);
+      if (iv.open && iv.type === "checked_out" && end < now) end = now; // overdue: still out
     }
-    if (iv.type === "reserved") {
-      return `<li><strong>${escapeHtml(iv.equipment_name)}</strong> — reserved by ${escapeHtml(iv.holder)}<br>
-        <small>${fmtDateTime(iv.start)} → ${fmtDateTime(iv.end)}${iv.note ? ` · ${escapeHtml(iv.note)}` : ""}</small></li>`;
-    }
-    const range = iv.end
-      ? `${fmtDateTime(iv.start)} → ${fmtDateTime(iv.end)}`
-      : `since ${fmtDateTime(iv.start)} (ongoing)`;
-    return `<li><strong>${escapeHtml(iv.equipment_name)}</strong> — unavailable: ${escapeHtml(iv.note || "no reason given")}<br>
-      <small>${range}</small></li>`;
-  }).join("");
+    if (end <= start) end = new Date(start.getTime() + HOUR_MS);
+    const s = start < dayStart ? dayStart : start;
+    const e = end > dayEnd ? dayEnd : end;
+    if (e <= dayStart || s >= dayEnd) continue; // doesn't touch this day
+    if (!rangesByItem.has(iv.equipment_id)) rangesByItem.set(iv.equipment_id, []);
+    rangesByItem.get(iv.equipment_id).push({ start: s, end: e, iv });
+  }
 
-  el.innerHTML = `<h3>${dateLabel}</h3><ul>${items}</ul>`;
+  let html = `<thead><tr><th></th>${equipment.map((e) => `<th>${escapeHtml(e.name)}</th>`).join("")}</tr></thead><tbody>`;
+  for (let h = 0; h < 24; h++) {
+    const hourStart = new Date(dayStart.getTime() + h * HOUR_MS);
+    const hourEnd = new Date(hourStart.getTime() + HOUR_MS);
+    const label = hourStart.toLocaleTimeString(undefined, { hour: "numeric" });
+    html += `<tr><td class="day-hour-label">${label}</td>`;
+    for (const eq of equipment) {
+      const hit = (rangesByItem.get(eq.id) || []).find((r) => r.start < hourEnd && r.end > hourStart);
+      if (hit) {
+        const iv = hit.iv;
+        const text = iv.type === "unavailable" ? (iv.note || "unavailable") : (iv.holder || "");
+        html += `<td class="day-cell busy-${iv.type}" title="${escapeHtml(eq.name)} · ${escapeHtml(text)}">${escapeHtml(text)}</td>`;
+      } else if (hourEnd <= now) {
+        html += `<td class="day-cell disabled"></td>`;
+      } else {
+        html += `<td class="day-cell free" data-eq-id="${eq.id}" data-eq-name="${escapeHtml(eq.name)}" data-hour="${h}"
+          title="Book ${escapeHtml(eq.name)} at ${label}">+</td>`;
+      }
+    }
+    html += `</tr>`;
+  }
+  html += `</tbody>`;
+  table.innerHTML = html;
+
+  table.querySelectorAll(".day-cell.free").forEach((cell) => {
+    cell.addEventListener("click", () => {
+      const start = new Date(dayStart.getTime() + Number(cell.dataset.hour) * HOUR_MS);
+      const end = new Date(start.getTime() + HOUR_MS);
+      $("#day-dialog").close();
+      openReserveDialog(Number(cell.dataset.eqId), cell.dataset.eqName, start, end);
+    });
+  });
+
+  $("#day-dialog").showModal();
 }
 
 // ---------- init ----------
