@@ -77,7 +77,7 @@ function showTab(name) {
   $("#tab-calendar").classList.toggle("active", name === "calendar");
   $("#view-equipment").classList.toggle("hidden", name !== "equipment");
   $("#view-calendar").classList.toggle("hidden", name !== "calendar");
-  if (name === "calendar") refreshCalendar();
+  if (name === "calendar") refreshCalendar(); else refreshEquipment();
 }
 
 $("#tab-equipment").addEventListener("click", () => showTab("equipment"));
@@ -646,3 +646,12 @@ function renderDayDetails(entries) {
 // ---------- init ----------
 
 refreshEquipment();
+
+// This is a shared, no-login tool — someone else can check an item in or
+// book it while you're sitting on a tab. There's no realtime push, so poll
+// whichever view is visible to pick up other people's changes automatically.
+const POLL_MS = 15000;
+setInterval(() => {
+  if (!$("#view-calendar").classList.contains("hidden")) refreshCalendar();
+  else if (!$("#view-equipment").classList.contains("hidden")) refreshEquipment();
+}, POLL_MS);

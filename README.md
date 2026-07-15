@@ -67,6 +67,8 @@ Day coloring accounts for how much of the day is actually consumed, not just whe
 
 All timestamps are stored as UTC ISO 8601 and rendered in the viewer's local timezone by the browser. Set `RECORDER_DB=/path/to/file.db` to override where the database lives.
 
+There's no realtime push (no websockets) — the frontend polls every 15 seconds so both tabs pick up changes made by other people (or another tab of your own) without a manual reload, and switching tabs always re-fetches immediately too.
+
 ## Where this could grow
 
 - **QR codes** — print a QR label per recorder pointing at a `/checkout?id=N` deep link, so people can scan-and-check-out from their phone. The `id` is stable, so labels survive redeploys.
